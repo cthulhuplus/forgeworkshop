@@ -1,0 +1,54 @@
+- hosts: all
+  become: true
+    
+  vars:
+    roles_path: '.'
+    php_version: '7.3'
+    php_enablerepo: "remi-php73,epel"
+
+  roles:
+    - role: geerlingguy.apache
+    - role: geerlingguy.repo-remi
+      when: ansible_os_family == 'RedHat'
+    - role: geerlingguy.php-versions
+    - role: geerlingguy.php
+#    - role: geerlingguy.mysql
+
+  tasks:
+    - name: Install VIM
+      package:
+        name: vim
+        state: present
+
+    - name: Reverse Proxify Apache Config - Swap ServerName for ProxyPreserveHost
+      lineinfile:
+        path: /etc/httpd/conf.d/vhosts.conf
+        regexp: "ServerName local.dev"
+        line: "ProxyPreserveHost On"
+        state: present
+
+    - name: Reverse Proxify Apache Config - Swap DocumentRoot for ProxyPass
+      lineinfile:
+        path: /etc/httpd/conf.d/vhosts.conf
+        regexp: 'DocumentRoot "/var/www/html"'
+        line: 'ProxyPass        "/"       "http://172.31.255.3/"'
+        state: present
+
+    - name: Reverse Proxify Apache Config - Create ProxyPassReserve after ProxyPass
+      lineinfile:
+        path: /etc/httpd/conf.d/vhosts.conf
+        regexp: '<Directory "/var/www/html">'
+        line: 'ProxyPassReverse        "/"       "http://172.31.255.3/"'
+        state: present
+
+    - name: Remove Directory Tag
+      lineinfile:
+        path: /etc/httpd/conf.d/vhosts.conf
+        regexp: '  <Directory "/var/www/html">'
+        state: absent
+
+    - name: Remove Closing Directory Tag
+      lineinfile:
+        path: /etc/httpd/conf.d/vhosts.conf
+        regexp: '  </Directory>'
+        state: absent
